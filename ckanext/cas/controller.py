@@ -1,15 +1,6 @@
 # -*- coding: utf-8 -
-try:
-    # CKAN 2.7 and later
-    from ckan.common import config
-except ImportError:
-    # CKAN 2.6 and earlier
-    from pylons import config
-
-try:
-    from pylons.controllers.util import redirect
-except ImportError:
-    from flask import redirect
+from ckan.common import config
+from flask import redirect
 
 import datetime
 import logging
