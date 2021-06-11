@@ -7,9 +7,9 @@ import logging
 import re
 import urllib
 import ckan.lib.base as base
-import ckan.lib.helpers as h
-import ckan.plugins as p
-import ckan.plugins.toolkit as t
+import ckan.lib.helpers as helpers
+import ckan.plugins as plugins
+import ckan.plugins.toolkit as toolkit
 from ckanext.cas.db import setup as db_setup
 from ckanext.cas.controller import CTRL, CASController
 from ckanext.cas.db import delete_user_entry, is_ticket_valid
@@ -21,11 +21,11 @@ abort = base.abort
 log = logging.getLogger(__name__)
 
 
-class CASClientPlugin(p.SingletonPlugin):
-    p.implements(p.IConfigurer)
-    p.implements(p.IAuthenticator, inherit=True)
-    p.implements(p.IRoutes, inherit=True)
-    p.implements(p.IConfigurable)
+class CASClientPlugin(plugins.SingletonPlugin):
+    plugins.implements(plugins.IConfigurer)
+    plugins.implements(plugins.IAuthenticator, inherit=True)
+    plugins.implements(plugins.IRoutes, inherit=True)
+    plugins.implements(plugins.IConfigurable)
 
     USER_ATTR_MAP = {}
     TICKET_KEY = None
@@ -45,7 +45,7 @@ class CASClientPlugin(p.SingletonPlugin):
         db_setup()
 
         # Load and parse user attributes mapping
-        user_mapping = t.aslist(config_.get('ckanext.cas.user_mapping'))
+        user_mapping = toolkit.aslist(config_.get('ckanext.cas.user_mapping'))
         for attr in user_mapping:
             key, val = attr.split('~')
             if '+' in val:
@@ -89,16 +89,16 @@ class CASClientPlugin(p.SingletonPlugin):
         self.TICKET_KEY = config.get('ckanext.cas.ticket_key', 'ticket')
         self.SERVICE_KEY = config.get('ckanext.cas.service_key', 'service')
         self.REDIRECT_ON_UNSUCCESSFUL_LOGIN = config.get('ckanext.cas.unsuccessful_login_redirect_url', None)
-        self.LOGIN_CHECKUP_TIME = t.asint(config.get('ckanext.cas.login_checkup_time', 600))
+        self.LOGIN_CHECKUP_TIME = toolkit.asint(config.get('ckanext.cas.login_checkup_time', 600))
         self.LOGIN_CHECKUP_COOKIE = config.get('ckanext.cas.login_checkup_cookie', 'cas_login_check')
-        self.VERIFY_CERTIFICATE = t.asbool(config.get('ckanext.cas.verify_certificate', True))
+        self.VERIFY_CERTIFICATE = toolkit.asbool(config.get('ckanext.cas.verify_certificate', True))
 
     # IConfigurer
 
     def update_config(self, config_):
-        t.add_template_directory(config_, 'templates')
-        t.add_public_directory(config_, 'public')
-        t.add_resource('fanstatic', 'cas')
+        toolkit.add_template_directory(config_, 'templates')
+        toolkit.add_public_directory(config_, 'public')
+        toolkit.add_resource('fanstatic', 'cas')
 
     def before_map(self, map):
         # Register callback for service validation (CAS 2.0, CAS 3.0)
@@ -114,18 +114,18 @@ class CASClientPlugin(p.SingletonPlugin):
         return map
 
     def identify(self):
-        environ = t.request.environ
+        environ = toolkit.request.environ
         remote_user = environ.get('REMOTE_USER', None)
         if remote_user and not is_ticket_valid(remote_user):
             log.debug('User logged out of CAS Server')
-            url = h.url_for(controller='user', action='logged_out_page',
+            url = helpers.url_for(controller='user', action='logged_out_page',
                             __ckan_no_root=True)
-            h.redirect_to(getattr(t.request.environ['repoze.who.plugins']['friendlyform'],
+            helpers.redirect_to(getattr(toolkit.request.environ['repoze.who.plugins']['friendlyform'],
                                   'logout_handler_path') + '?came_from=' + url)
         elif not remote_user and not isinstance(environ['pylons.controller'], CASController) \
                 and not re.match(r'.*/api(/\d+)?/action/.*', environ['PATH_INFO']) \
                 and not re.match(r'.*/dataset/.+/resource/.+/download/.+', environ['PATH_INFO']):
-            login_checkup_cookie = t.request.cookies.get(self.LOGIN_CHECKUP_COOKIE, None)
+            login_checkup_cookie = toolkit.request.cookies.get(self.LOGIN_CHECKUP_COOKIE, None)
             if login_checkup_cookie:
                 return
             log.debug('Checking if CAS session exists for user')
@@ -141,7 +141,7 @@ class CASClientPlugin(p.SingletonPlugin):
         elif self.CAS_VERSION == 3:
             url = self.CAS_LOGIN_URL + params + self.CAS_APP_URL + '/cas/saml_callback'
         if next:
-            url = url + '?next=' + urllib.quote(t.request.environ['CKAN_CURRENT_URL'])
+            url = url + '?next=' + urllib.quote(toolkit.request.environ['CKAN_CURRENT_URL'])
         return url
 
     def login(self):
@@ -149,12 +149,12 @@ class CASClientPlugin(p.SingletonPlugin):
         redirect(cas_login_url)
 
     def logout(self):
-        delete_user_entry(t.c.user)
-        if t.asbool(config.get('ckanext.cas.single_sign_out')):
+        delete_user_entry(toolkit.c.user)
+        if toolkit.asbool(config.get('ckanext.cas.single_sign_out')):
             cas_logout_url = self.CAS_LOGOUT_URL + '?service=' + self.CAS_APP_URL + '/cas/logout'
             redirect(cas_logout_url)
         # TODO: Refactor into helper
-        url = h.url_for(controller='user', action='logged_out_page',
+        url = helpers.url_for(controller='user', action='logged_out_page',
                         __ckan_no_root=True)
-        h.redirect_to(getattr(t.request.environ['repoze.who.plugins']['friendlyform'],
+        helpers.redirect_to(getattr(toolkit.request.environ['repoze.who.plugins']['friendlyform'],
                               'logout_handler_path') + '?came_from=' + url)

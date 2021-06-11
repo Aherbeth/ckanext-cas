@@ -1,7 +1,7 @@
 import logging
 import datetime
 import sqlalchemy.exc
-import ckan.plugins.toolkit as t
+import ckan.plugins.toolkit as toolkit
 
 from ckan.model import domain_object
 from ckan.model.meta import Session, metadata, mapper
@@ -73,7 +73,7 @@ def define_cas_tables():
 def insert_entry(ticket_id, user=None):
     try:
         if user is None:
-            user = t.c.user
+            user = toolkit.c.user
         cas_user = CasUser(ticket_id, user)
         cas_user.save()
         return True
